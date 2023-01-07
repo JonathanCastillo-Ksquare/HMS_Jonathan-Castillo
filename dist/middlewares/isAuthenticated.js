@@ -1,4 +1,6 @@
 "use strict";
+/*                                      Auth Module - Requirements
+    4. Allow a patient to sign up to your system by creating an endpoint without needing to authenticate  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -31,21 +33,35 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-require("dotenv/config");
-const app_1 = __importDefault(require("./app"));
-const connection_1 = require("./database/connection");
-require("./models/associations");
+exports.isAuthenticated = void 0;
 const admin = __importStar(require("firebase-admin"));
-admin.initializeApp();
-const PORT = process.env.PORT;
-function main() {
-    return __awaiter(this, void 0, void 0, function* () {
-        yield (0, connection_1.init)();
-        app_1.default.listen(PORT, () => console.log('Server running on port:', PORT));
-    });
-}
-main();
+// Function to check if a user is authenticate
+const isAuthenticated = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const { authorization } = req.headers;
+    // Check if the authorization header exists
+    if (!authorization) {
+        return res.status(401).send({ error: 'No authorization header' });
+    }
+    //No correct scheme(Bearer)
+    if (!authorization.startsWith("Bearer")) {
+        return res.status(401).send({ error: 'Bearer schema expected' });
+    }
+    //Check if the token is valid
+    const splittedtoken = authorization.split("Bearer ");
+    if (splittedtoken.length !== 2) {
+        return res.status(401).send({ error: 'Invalid token' });
+    }
+    const token = splittedtoken[1];
+    try {
+        const decodedToken = yield admin.auth().verifyIdToken(token);
+        res.locals = Object.assign(Object.assign({}, res.locals), { email: decodedToken.email, uid: decodedToken.uid, role: decodedToken.role });
+        return next();
+    }
+    catch (error) {
+        console.log(error);
+        return res.status(401).send({ error: 'No authorized' });
+    }
+    // si todo esto pasa nuestro usuairo esta correctamente autenticado y tiene derecho a acceder a los recursos
+});
+exports.isAuthenticated = isAuthenticated;
